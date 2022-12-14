@@ -1,0 +1,439 @@
+---
+title: "Supplemental figures and tables"
+subtitle: "*Metabolic profiling early post allogeneic haematopoietic cell transplantation in the context of CMV infection*"
+
+author: "By Kirstine K. Rasmussen"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+    #rmdformats::material
+    html_document:
+        theme: paper #cosmo  sandstorm
+        highlight: tango
+        toc: TRUE
+        toc_float: FALSE
+        toc_depth: 2
+        number_sections: FALSE
+        df_print: paged
+        fig_crop: no
+knit: (
+  function(inputFile, encoding) { 
+
+    pSubTitle <- 'WGCNA_module_results'
+
+    rmarkdown::render( 
+      input       = inputFile, 
+      encoding    = encoding, 
+      params      = list(sub_title = pSubTitle),      
+      output_file = pSubTitle) })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, fig.align="center", message=FALSE, warning=FALSE)
+```
+
+```{r libraries, include=FALSE}
+library(knitr)
+library(dplyr)
+library(leaflet)
+library(readxl)
+library(tidyverse)
+library(cowplot)
+library(webr)
+library(DT)
+library(png)
+library(WGCNA)
+library(plotly)
+library(heatmaply)
+library(data.table)
+```
+
+```{r costum_functions, include=FALSE}
+source('Cross_sectional_WGCNA_functions.R')
+multiplesheets <- function(fname) {
+  # Function reads in excel file and returns list of data frames with all sheets
+  
+  # getting info about all excel sheets
+  sheets <- readxl::excel_sheets(fname)
+  tibble <- lapply(sheets, function(x) readxl::read_excel(fname, sheet = x))
+  data_frame <- lapply(tibble, as.data.frame)
+  
+  # assigning names to data frames
+  names(data_frame) <- sheets
+  
+  # print data frame
+  print(data_frame)
+}
+
+subcolors <- function(.dta,main,mainCol){
+  # Function creates faded colors based on a set of main colors
+  tmp_dta = cbind(.dta,1,'col')
+  tmp1 = unique(.dta[[main]])
+  for (i in 1:length(tmp1)){
+      tmp_dta$"col"[.dta[[main]] == tmp1[i]] = mainCol[i]
+  }
+  u <- unlist(by(tmp_dta$"1",tmp_dta[[main]],cumsum))
+  n <- dim(.dta)[1]
+  subcol=rep(rgb(0,0,0),n);
+  for(i in 1:n){
+      t1 = col2rgb(tmp_dta$col[i])/256
+      subcol[i]=rgb(t1[1],t1[2],t1[3],1/(1+u[i]))
+  }
+  return(subcol);
+}
+```
+
+```{r load_data, include=FALSE}
+
+# Load abundances 
+metData <- read_tsv("Data/01_Metabolites_clinical_cross_sectional.tsv")
+lipData <- read_tsv("Data/01_Lipids_clinical_cross_sectional.tsv")
+
+# Load WGCNA results
+met_mods <- read_xlsx("Data/WGCNA_CS_met_results.xlsx")
+lip_mods <- read_xlsx("Data/WGCNA_CS_lip_results.xlsx")
+headers <- c("Module","Biochemical","Super pathway","Sub pathway","HMDB ID","KEGG ID")
+colnames(met_mods) <- headers
+colnames(lip_mods) <- headers
+
+
+```
+
+The following tables and figures are the result of a weighted correlation network analysis of metabolomics and lipidomics data from plasma samples of patients who underwent an allogeneic haematopoietic stem cell transplantation at Rigshospitalet, Copenhagen University Hospital, Denmark in the period January 2016 to October 2017. The analyses were performed using the <i>Weighed Gene Co-expression Network Analysis</i> (WGCNA) R package ([link](https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/)) which identifies modules (clusters) of analytes with high topological overlap. The metabolomics and lipidomics data were analysed separately and clusters between datasets are not associated. The figures shown in this document were constructed to visualise the results from the WGCNA and are not part of the package.
+
+The content of this file is presented to foster hypothesis-generation for use in future studies. All code is available in GitHub ([link]()).
+
+<hr />
+
+## Table of molecules and modules
+
+All metabolites and lipids included in the analyses are found in the tables below. You can sort or search by module to get all molecules in a single module, or by pathway to see how they are distributed across modules. Metabolites with names 'X - #####' are those detected by use of HPLC-MS/MS but not annotated in the reference library.
+
+### Metabolites
+
+```{r table_met, echo=FALSE, include=T}
+# Table of all analytes
+datatable(met_mods, rownames = FALSE, filter = 'top')
+```
+
+### Lipids
+
+```{r table_lip, echo=FALSE, include=T}
+# Table of lipidomics
+datatable(lip_mods, rownames = FALSE, filter = 'top')
+```
+
+<hr />
+
+## Module memberships
+
+The figures below show the distribution of module memberships (definition below) in each module. The title in each subplot describes which module is represented and the amount of molecules placed within it. The grey module is in WGCNA used as a bin for molecules not fitting in the remaining modules.
+
+*Module membership:* A term used in the WGCNA package to describe the correlation between a molecule abundance profile and the first principal component (weighted average) of all molecules in the same module.
+
+### Metabolites
+
+```{r MM_met, echo=FALSE, include=T}
+knitr::include_graphics('Figures/ModuleMemberships_CS_met_10.png')
+```
+
+### Lipids
+
+```{r MM_lip, echo=FALSE, include=T}
+knitr::include_graphics('Figures/ModuleMemberships_CS_lip_12.png')
+```
+
+<hr />
+
+## Module correlations with clinical traits
+
+The figures below show correlation heatmaps of modules and clinical traits. Each module was tested for correlation with a selection of clinical variables related to the risk of CMV infection. Correlations were calculated with the Spearman's Rank correlation measure and evaluated by Fisher's exact statistics and FDR adjusted p-values (q-values). You can hover over the cells to see exact correlations and q-values.
+
+### Metabolites
+
+```{r heatmap_met, echo=FALSE, fig.height=6, fig.align="center", include=T}
+load("Rdata/04_WGCNA_CS_met_all.RData")
+config(interactiveHeatmap(datExpr,datTraits,MEs,minMod,dataType), scrollZoom = TRUE, displaylogo = FALSE)
+```
+
+<br>
+
+### Lipids
+
+```{r heatmap_lip, echo=FALSE, fig.height=4, fig.align="center", include=T}
+load("Rdata/04_WGCNA_CS_lip_all.RData")
+config(interactiveHeatmap(datExpr,datTraits,MEs,minMod,dataType), scrollZoom = TRUE, displaylogo = FALSE)
+```
+
+*q value significance:* \*\<0.05, \*\*\<0.01, \*\*\*\<0.0001.
+
+*CMV infection:* Detected CMV infection within 100 days post-aHSCT; 0 = no detected CMV, 1 = detected CMV.\
+*CMV risk score:* Serostatus combination of donor and recipient; 1 (low risk) = D$^{+}$/R$^{-}$ and D$^{-}$/R$^{-}$, 2 (intermediate risk) = D$^{+}$/R$^{+}$, 3 (high risk) = D$^{-}$/R$^{+}$.\
+*Conditioning type:* 0 = non-myeloablative (Mini), 1 = myeloablative (MAC).\
+*Sex:* 1 = male, 2 = female.\
+*Age at aHSCT:* Continuous variable [17-73].\
+
+<hr />
+
+## Super-pathway content in modules
+
+The figures below shows the super-pathway content per module. Super-pathways are represented on the x-axis by color-coded bars. The percentage of molecules annotated to each super-pathway placed in each module is indicated on the y-axis. E.g. 10% of all energy related metabolites are placed within the black module.
+
+### Metabolites
+
+```{r Pathways_in_mods_met, echo=FALSE, include=T}
+knitr::include_graphics('Figures/PathwaysInModules_CS_met_10_wide.png')
+```
+
+### Lipids
+
+```{r Pathways_in_mods_lip, echo=FALSE, include=T}
+knitr::include_graphics('Figures/PathwaysInModules_CS_lip_12_wide.png')
+```
+
+<hr />
+
+## Sub-pathway content per module
+
+Metabolic pathway content within each module is presented below in donutplots. Click between tabs to view each module. Some modules contains too many molecules from the same sub-pathway to be shown in full. Complete lists can be found by searching the modules in the tables above.
+
+### Metabolites {.tabset}
+
+```{r met_donuts, results='asis', echo=F, include=T}
+
+# Get color codes from Paired palette
+colors <- RColorBrewer::brewer.pal(10, "Paired")
+# Add column of colors per pathway
+pathCol <- as.data.frame(cbind(sort(unique(met_mods$`Super pathway`))[c(1:8,10,9)],colors))
+names(pathCol) <- c('Super pathway','Color')
+met_modsCol <- merge(met_mods,pathCol,by='Super pathway')[c(2,3,1,4:7)] %>% 
+  .[order(.$'Biochemical'),]
+
+# Get module names
+met_modules <- unique(met_mods$Module)
+
+for (i in 1:length(met_modules)){
+  cat('\n')
+  cat('####',met_modules[i],' \n')
+  
+  # Save current module
+  cur_mod <- subset(met_modsCol, Module == met_modules[i]) %>%
+    .[order(.$"Super pathway"),]
+  colnames(cur_mod) = c("MODULE", "BIOCHEMICAL","SUPER_PATHWAY","SUB_PATHWAY",
+                      "HMDB_ID","KEGG_ID","COLOR")
+
+  # Make dataframes for plotting
+  met_agg_sub <- cur_mod %>%
+    select("BIOCHEMICAL","SUB_PATHWAY") %>%
+    mutate(n=1) %>%
+    as.data.table(.) %>%
+    .[, .(chem=paste(BIOCHEMICAL, collapse="\n"),n=sum(n)), by=SUB_PATHWAY] %>%
+    as.data.frame(.) %>%
+    merge(.,cur_mod[,c("SUPER_PATHWAY","SUB_PATHWAY")],by="SUB_PATHWAY",sort=F) %>%
+    .[!duplicated(.),] %>%
+    mutate(label_SUB_PATHWAY = SUB_PATHWAY) %>%
+    mutate(sub_color = subcolors(.,"SUPER_PATHWAY",as.character(unique(cur_mod$COLOR))))
+
+  met_agg_sup <- cur_mod %>%
+    select("BIOCHEMICAL","SUPER_PATHWAY","COLOR") %>%
+    mutate(n=1) %>%
+    as.data.table(.) %>%
+    .[, .(chem=paste(BIOCHEMICAL, collapse="\n"),n=sum(n),COLOR=unique(COLOR)), by=SUPER_PATHWAY] %>%
+    as.data.frame(.)
+  
+  sub_pie <- plot_ly(data = met_agg_sub,
+          labels = ~SUB_PATHWAY,
+          values = ~n,
+          # Label text
+          textinfo = 'none',
+          # Hover text
+          text = ~chem,
+          hovertemplate =
+            "<b><i>%{label}</i></b><br><b>Percent of module</b>: %{percent}<br><b>Amount of molecules</b>: %{value}<br><br>%{text}<extra></extra>",
+          # Make order fit with super pathways
+          direction = "clockwise",
+          sort = F,
+          # Colors and separation lines
+          marker = list(colors = ~sub_color, line = list(color = '#FFFFFF', width = 1)),
+          # Legend
+          showlegend = T,
+          legendgroup = 'group2',
+          # Control margins
+          automargin = T
+          ) %>% add_pie(hole = 0.65);sub_pie
+
+  sup_pie <- sub_pie %>% add_pie(data = met_agg_sup,
+          labels = ~SUPER_PATHWAY,
+          values = ~n,
+          # Label text
+          textposition = 'inside',
+          textinfo = 'label',
+          insidetextfont = list(color = '#FFFFFF'),
+          # Hover text
+          hovertemplate =
+            "<b><i>%{label}</i></b><br><b>Percent of module</b>: %{percent}<br><b>Amount of molecules</b>: %{value}<extra></extra>",
+          # Make order fit with super pathways
+          direction = "clockwise",
+          sort = F,
+          # Legend
+          legendgroup = 'group1',
+          # Colors and separation lines
+          marker = list(colors = ~COLOR, line = list(color = '#FFFFFF', width = 1)),
+          domain = list(x=c(0.15,0.85), y=c(0.15,0.85))) %>% 
+    layout(margin=list(l=0, r=0, t=0, b=150),
+           hoverlabel = list(font=list(size=11)),
+           legend=list(title = list(text = "<b>Pathways</b>"))) %>%
+    config(displaylogo = FALSE)
+  
+  print(htmltools::tagList(sup_pie))
+  
+  #break
+  cat('\n\n\n\n\n\n')
+}
+
+```
+
+### Lipids {.tabset}
+
+```{r lip_donuts, results='asis', fig.width=12, fig.height=12, echo=F, include=T}
+
+# Get color codes from Paired palette
+colors <- RColorBrewer::brewer.pal(11, "Paired")
+# Add column of colors per pathway
+pathCol <- as.data.frame(cbind(sort(unique(lip_mods$`Super pathway`))[c(1:11)],colors))
+names(pathCol) <- c('Super pathway','Color')
+lip_modsCol <- merge(lip_mods,pathCol,by='Super pathway')[c(2,3,1,4:7)] %>% 
+  .[order(.$'Biochemical'),]
+
+
+# Get module names
+lip_modules <- unique(lip_mods$Module)
+
+for (i in 1:length(lip_modules)){
+  cat('\n')
+  cat('####',lip_modules[i],' \n')
+  
+  # Save current module
+  cur_mod <- subset(lip_modsCol, Module == lip_modules[i]) %>%
+    .[order(.$"Super pathway"),]
+  colnames(cur_mod) = c("MODULE", "BIOCHEMICAL","SUPER_PATHWAY","SUB_PATHWAY",
+                      "HMDB_ID","KEGG_ID","COLOR")
+
+  # Make dataframes for plotting
+  lip_agg_sub <- cur_mod %>%
+    select("BIOCHEMICAL","SUB_PATHWAY") %>%
+    mutate(n=1) %>%
+    as.data.table(.) %>%
+    .[, .(chem=paste(BIOCHEMICAL, collapse="\n"),n=sum(n)), by=SUB_PATHWAY] %>%
+    as.data.frame(.) %>%
+    merge(.,cur_mod[,c("SUPER_PATHWAY","SUB_PATHWAY")],by="SUB_PATHWAY",sort=F) %>%
+    .[!duplicated(.),] %>%
+    mutate(sub_color = subcolors(.,"SUPER_PATHWAY",as.character(unique(cur_mod$COLOR))))
+
+  lip_agg_sup <- cur_mod %>%
+    select("BIOCHEMICAL","SUPER_PATHWAY","COLOR") %>%
+    mutate(n=1) %>%
+    as.data.table(.) %>%
+    .[, .(chem=paste(BIOCHEMICAL, collapse="\n"),n=sum(n),COLOR=unique(COLOR)), by=SUPER_PATHWAY] %>%
+    as.data.frame(.)
+
+  sub_pie <- plot_ly(data = lip_agg_sub,
+          labels = ~SUB_PATHWAY,
+          values = ~n,
+          # Label text
+          textposition = 'outside',
+          textinfo = 'none',
+          # Hover text
+          text = ~chem,
+          hovertemplate =
+            "<b><i>%{label}</i></b><br><b>Percent of module</b>: %{percent}<br><b>Amount of molecules</b>: %{value}<br><br>%{text}<extra></extra>",
+          # Make order fit with super pathways
+          direction = "clockwise",
+          sort = F,
+          # Colors and separation lines
+          marker = list(colors = ~sub_color, line = list(color = '#FFFFFF', width = 1)),
+          # Legend
+          showlegend = T,
+          legendgroup = 'group2',
+          # Control margins
+          automargin = T
+          ) %>% add_pie(hole = 0.65);#sub_pie
+
+  sup_pie <- sub_pie %>% add_pie(data = lip_agg_sup,
+          labels = ~SUPER_PATHWAY,
+          values = ~n,
+          # Label text
+          textposition = 'inside',
+          textinfo = 'label',
+          insidetextfont = list(color = '#FFFFFF'),
+          # Hover text
+          text = ~chem,
+          hovertemplate =
+            "<b><i>%{label}</i></b><br><b>Percent of module</b>: %{percent}<br><b>Amount of molecules</b>: %{value}<extra></extra>",
+          # Make order fit with super pathways
+          direction = "clockwise",
+          sort = F,
+          # Colors and separation lines
+          marker = list(colors = ~COLOR, line = list(color = '#FFFFFF', width = 1)),
+          # Legend
+          legendgroup = 'group1',
+          # Control margins
+          automargin = T,
+          domain = list(x=c(0.15,0.85), y=c(0.15,0.85))) %>%
+    layout(margin=list(l=0, r=0, t=0, b=150),
+           hoverlabel = list(font=list(size=11)),
+           legend=list(title = list(text = "<b>Pathways</b>"))) %>%
+    config(displaylogo = FALSE)
+  
+  print(htmltools::tagList(sup_pie))
+  
+  cat('\n\n\n\n\n\n')
+}
+
+```
+
+## Descriptive statistics
+Basic descriptive statistics for the complete cohort, the cases, and the controls.
+
+### Metabolites  {.tabset}
+```{r met_abundances, results='asis', echo=FALSE}
+
+cat('\n')
+cat('#### All cohort \n')
+metTab <- t(round(sapply(metData[,2:923], function(x) c(mean=mean(x),sd=sd(x),median=median(x),min=min(x),max=max(x))),2))
+datatable(metTab)
+
+cat('\n')
+cat('#### CMV positive cases \n')
+Cases <- subset(metData, Group==1)
+metTabCases <- t(round(sapply(Cases[,2:923], function(x) c(mean=mean(x),sd=sd(x),median=median(x),min=min(x),max=max(x))),2))
+datatable(metTabCases)
+
+cat('\n')
+cat('#### CMV negative controls \n')
+Controls <- subset(metData, Group==0)
+metTabControls <- t(round(sapply(Controls[,2:923], function(x) c(mean=mean(x),sd=sd(x),median=median(x),min=min(x),max=max(x))),2))
+datatable(metTabControls)
+
+```
+
+### Lipids  {.tabset}
+```{r lip_abundances, results='asis', echo=FALSE}
+
+cat('\n')
+cat('#### All cohort \n')
+lipTab <- t(round(sapply(lipData[,2:949], function(x) c(mean=mean(x),sd=sd(x),median=median(x),min=min(x),max=max(x))),2))
+datatable(lipTab)
+
+cat('\n')
+cat('#### CMV positive cases \n')
+Cases <- subset(lipData, Group==1)
+lipTabCases <- t(round(sapply(Cases[,2:949], function(x) c(mean=mean(x),sd=sd(x),median=median(x),min=min(x),max=max(x))),2))
+datatable(lipTabCases)
+
+cat('\n')
+cat('#### CMV negative controls \n')
+Controls <- subset(lipData, Group==0)
+lipTabControls <- t(round(sapply(Controls[,2:949], function(x) c(mean=mean(x),sd=sd(x),median=median(x),min=min(x),max=max(x))),2))
+datatable(lipTabControls)
+
+```
